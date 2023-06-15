@@ -1,1 +1,1 @@
-## end to end Machine template
+## End to end Machine template
