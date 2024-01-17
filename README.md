@@ -1,43 +1,35 @@
-## End to end Machine template
+# The build pipeline only zips the artifacts and uploads to S3.
+# Terraform only does deploy, not build, so is not used here
 
-Starting: Bash
-==============================================================================
-Task         : Bash
-Description  : Run a Bash script on macOS, Linux, or Windows
-Version      : 3.231.5
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/bash
-==============================================================================
-Generating script.
-Script contents:
-aws cloudformation package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket ppd.test.pricfile.moderinization --metadata Build-Number=20240117.1
-========================== Starting Command Output ===========================
-/bin/bash /azuredevopsdownloads/_work/_temp/4c6ecc28-8c35-470b-8e1a-d20fe4191c42.sh
-
-Unable to upload artifact lambda/dealer/price/ppd-custom-dealer-monthly-pricefile-scheduler.py referenced by Code parameter of CustomDealerMonthlyPricefileSchedulerFunction resource.
-Unable to locate credentials
-
-##[error]Bash exited with code '255'.
-Finishing: Bash
-
-
-
-Starting: Bash
-==============================================================================
-Task         : Bash
-Description  : Run a Bash script on macOS, Linux, or Windows
-Version      : 3.231.5
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/bash
-==============================================================================
-Generating script.
-Script contents:
-aws cloudformation package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket ppd.test.pricfile.moderinization --metadata Build-Number=20240117.2
-========================== Starting Command Output ===========================
-/bin/bash /azuredevopsdownloads/_work/_temp/7e271a8e-6e2e-4750-b290-2d0800fd9e0c.sh
-
-Unable to upload artifact lambda/dealer/price/ppd-custom-dealer-monthly-pricefile-scheduler.py referenced by Code parameter of CustomDealerMonthlyPricefileSchedulerFunction resource.
-Unable to locate credentials
-
-##[error]Bash exited with code '255'.
-Finishing: Bash
+stages:
+- stage: PackageDeploy
+  variables:
+    S3Bucket: ppd.test.pricfile.moderinization
+    AWS_Region: us-west-2
+  jobs:
+  - job: CreateAndUpload
+    pool:
+      name: PPD-AWS
+      vmImage: 'ubuntu-latest'
+    steps:
+      - task: Bash@3
+        inputs:
+          noProfile: false
+          targetType: 'inline'
+          script: |
+            aws cloudformation package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket $(S3Bucket) --metadata Build-Number=$(Build.BuildNumber)
+      
+      - task: CopyFiles@2
+        inputs:
+          SourceFolder: '$(Build.SourcesDirectory)'
+          Contents:   '**'
+          TargetFolder: '$(Build.ArtifactStagingDirectory)'
+      
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: '$(Build.ArtifactStagingDirectory)'
+          artifact: 'pricefilemodernization'
+trigger:
+  branches: 
+    include: [main]
+  
